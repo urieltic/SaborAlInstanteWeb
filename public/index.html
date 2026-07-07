@@ -54,7 +54,6 @@
     </div>
 
     <script>
-        // Al usar rutas relativas fijas, no importa el dominio de Render ni las mayúsculas/minúsculas.
         const urlParams = new URLSearchParams(window.location.search);
         const numMesa = parseInt(urlParams.get('mesa')) || 1;
         document.getElementById('lblMesa').innerText = numMesa;
@@ -146,7 +145,13 @@
                 return;
             }
 
-            const resumen = carrito.map(i => i.nombre).join('\n');
+            // Generar la hora de forma segura en formato de 24 horas (HH:MM)
+            const ahora = new Date();
+            const horaFormateada = ahora.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+
+            // Unir los platillos y agregar la etiqueta de la hora al final
+            const listaPlatillos = carrito.map(i => i.nombre).join('\n');
+            const resumen = `${listaPlatillos}\n\n🕒 Hora: ${horaFormateada}`;
 
             try {
                 const response = await fetch('/api/pedidos', {

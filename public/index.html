@@ -18,6 +18,10 @@
         .producto-precio { font-size: 16px; font-weight: bold; color: #E65100; margin-top: 5px; }
         .btn-add { background-color: #FFE0B2; color: #E65100; border: none; padding: 8px 16px; border-radius: 20px; font-weight: bold; cursor: pointer; }
         
+        /* 🎨 NUEVOS ESTILOS PARA PLATILLOS AGOTADOS */
+        .img-agotada { filter: grayscale(100%); opacity: 0.4; }
+        .badge-agotado { background-color: #D84315; color: white; padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; text-transform: uppercase; border: none; display: inline-block; }
+
         /* PANEL DEL CARRITO FIJO ABAJO */
         #carrito-panel { position: fixed; bottom: 0; left: 0; right: 0; background: white; box-shadow: 0 -4px 10px rgba(0,0,0,0.15); border-radius: 16px 16px 0 0; padding: 15px; z-index: 1000; }
         .carrito-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #FFE0B2; padding-bottom: 8px; margin-bottom: 10px; }
@@ -68,79 +72,10 @@
                 container.innerHTML = '';
                 productosData.forEach(p => {
                     const imgUrl = p.imagenurl || 'https://via.placeholder.com/80?text=Sabor';
-                    container.innerHTML += `
-                        <div class="producto-card">
-                            <img class="producto-img" src="${imgUrl}">
-                            <div class="producto-info">
-                                <div class="producto-name">${p.nombre}</div>
-                                <div class="producto-detalles">⏱️ ${p.tiempopreparacion} min</div>
-                                <div class="producto-precio">$${parseFloat(p.precio).toFixed(2)}</div>
-                            </div>
-                            <button class="btn-add" onclick="agregarAlCarrito(${p.id})">+ Añadir</button>
-                        </div>
-                    `;
-                });
-            } catch (e) { console.error(e); }
-        }
+                    
+                    // 🛠️ LÓGICA DE CONTROL DISPONIBLE / AGOTADO
+                    let botonOTexto = '';
+                    let claseImagen = 'producto-img';
 
-        function agregarAlCarrito(id) {
-            const prod = productosData.find(p => p.id === id);
-            if(prod) { carrito.push(prod); actualizarInterfazCarrito(); }
-        }
-
-        // Quita un solo producto del carrito
-        function eliminarDelCarrito(index) {
-            carrito.splice(index, 1);
-            actualizarInterfazCarrito();
-        }
-
-        // Quita todos los productos a la vez
-        function vaciarCarrito() {
-            carrito = [];
-            actualizarInterfazCarrito();
-        }
-
-        function actualizarInterfazCarrito() {
-            const lista = document.getElementById('lista-carrito');
-            const totalSpan = document.getElementById('total-precio');
-            lista.innerHTML = '';
-            
-            if (carrito.length === 0) {
-                lista.innerHTML = '<div style="color:#9E9E9E; text-align:center; padding:10px;">El carrito está vacío.</div>';
-                totalSpan.innerText = '0.00';
-                return;
-            }
-            
-            let total = 0;
-            carrito.forEach((item, index) => {
-                total += parseFloat(item.precio);
-                lista.innerHTML += `
-                    <div class="carrito-item">
-                        <span>• ${item.nombre} ($${parseFloat(item.precio).toFixed(2)})</span>
-                        <button class="btn-eliminar-item" onclick="eliminarDelCarrito(${index})">❌</button>
-                    </div>
-                `;
-            });
-            totalSpan.innerText = total.toFixed(2);
-        }
-
-        // Envía el pedido de manera externa a la nube
-        async function enviarPedido() {
-            if (carrito.length === 0) { alert("El carrito está vacío."); return; }
-            const resumen = carrito.map(i => i.nombre).join(', ');
-            try {
-                const response = await fetch('/api/pedidos', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ mesa: numMesa, contenido: resumen })
-                });
-                if (response.ok) { alert("¡Pedido enviado con éxito!"); vaciarCarrito(); }
-                else { alert("Error al enviar el pedido."); }
-            } catch (e) { alert("Sin conexión con el servidor externo."); }
-        }
-        
-        cargarMenu();
-        actualizarInterfazCarrito();
-    </script>
-</body>
-</html>
+                    if (p.disponible === false) {
+                        botonOTexto = `<span class="badge-agotado">⚠️ Agotado</span>`;

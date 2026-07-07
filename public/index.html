@@ -70,12 +70,113 @@
                 productosData = await response.json();
                 const container = document.getElementById('menu-container');
                 container.innerHTML = '';
+                
                 productosData.forEach(p => {
                     const imgUrl = p.imagenurl || 'https://via.placeholder.com/80?text=Sabor';
                     
-                    // 🛠️ LÓGICA DE CONTROL DISPONIBLE / AGOTADO
+                    // 🛠️ LÓGICA DE CONTROL DISPONIBLE / AGOTADO SEGURA
                     let botonOTexto = '';
                     let claseImagen = 'producto-img';
 
-                    if (p.disponible === false) {
+                    if (p.disponible == false || p.disponible === 'false') {
                         botonOTexto = `<span class="badge-agotado">⚠️ Agotado</span>`;
+                        claseImagen = 'producto-img img-agotada';
+                    } else {
+                        botonOTexto = `<button class="btn-add" onclick="agregarAlCarrito(${p.id})">+ Añadir</button>`;
+                    }
+
+                    container.innerHTML += `
+                        <div class="producto-card">
+                            <img src="${imgUrl}" class="${claseImagen}" alt="${p.nombre}">
+                            <div class="producto-info">
+                                <div class="producto-name">${p.nombre}</div>
+                                <div class="producto-detalles">🕒 Tdo. Prep: ${p.tiempopreparacion} min</div>
+                                <div class="producto-precio">$${parseFloat(p.precio).toFixed(2)}</div>
+                            </div>
+                            <div>
+                                ${botonOTexto}
+                            </div>
+                        </div>
+                    `;
+                });
+            } catch (error) {
+                console.error("Error al cargar el menú:", error);
+            }
+        }
+
+        function agregarAlCarrito(id) {
+            const producto = productosData.find(p => p.id === id);
+            if (producto) {
+                carrito.push(producto);
+                actualizarCarrito();
+            }
+        }
+
+        function eliminarDelCarrito(index) {
+            carrito.splice(index, 1);
+            actualizarCarrito();
+        }
+
+        function vaciarCarrito() {
+            carrito = [];
+            actualizarCarrito();
+        }
+
+        function actualizarCarrito() {
+            const lista = document.getElementById('lista-carrito');
+            const totalSpan = document.getElementById('total-precio');
+            lista.innerHTML = '';
+            let total = 0;
+
+            carrito.forEach((item, index) => {
+                total += parseFloat(item.precio);
+                lista.innerHTML += `
+                    <div class="carrito-item">
+                        <span>🍔 ${item.nombre}</span>
+                        <div>
+                            <span>$${parseFloat(item.precio).toFixed(2)}</span>
+                            <button class="btn-eliminar-item" onclick="eliminarDelCarrito(${index})">×</button>
+                        </div>
+                    </div>
+                `;
+            });
+
+            totalSpan.innerText = total.toFixed(2);
+        }
+
+        async function enviarPedido() {
+            if (carrito.length === 0) {
+                alert("El carrito está vacío.");
+                return;
+            }
+
+            // Unimos los platillos con un salto de línea (\n) para que salgan en vertical en C#
+            const resumen = carrito.map(i => i.nombre).join('\n');
+
+            try {
+                const response = await fetch('/api/pedidos', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        mesa: numMesa,
+                        contenidopedido: resumen
+                    })
+                });
+
+                if (response.ok) {
+                    alert("🚀 ¡Pedido enviado con éxito a la cocina!");
+                    vaciarCarrito();
+                } else {
+                    alert("Hubo un problema al enviar el pedido.");
+                }
+            } catch (error) {
+                console.error("Error al enviar el pedido:", error);
+                alert("Error de conexión con el servidor.");
+            }
+        }
+
+        // Cargar el menú inmediatamente al abrir la página
+        cargarMenu();
+    </script>
+</body>
+</html>

@@ -1,50 +1,176 @@
-const express = require('express');
-const cors = require('cors');
-const { Pool } = require('pg');
-const path = require('path');
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sabor Al Instante - Menú</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; }
+        body { background-color: #FFF3E0; padding-bottom: 240px; }
+        header { background-color: #E65100; color: white; text-align: center; padding: 20px; }
+        .mesa-badge { background-color: #795548; display: inline-block; padding: 5px 15px; border-radius: 20px; font-size: 14px; margin-top: 5px; }
+        .container { max-width: 600px; margin: 20px auto; padding: 0 15px; }
+        .producto-card { background: white; border-radius: 12px; padding: 15px; margin-bottom: 15px; display: flex; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .producto-img { width: 80px; height: 80px; object-fit: cover; border-radius: 8px; margin-right: 15px; background-color: #FFE0B2; }
+        .producto-info { flex: 1; }
+        .producto-name { font-size: 16px; font-weight: bold; color: #5D4037; }
+        .producto-detalles { font-size: 12px; color: #757575; margin: 4px 0; }
+        .producto-precio { font-size: 16px; font-weight: bold; color: #E65100; margin-top: 5px; }
+        .btn-add { background-color: #FFE0B2; color: #E65100; border: none; padding: 8px 16px; border-radius: 20px; font-weight: bold; cursor: pointer; }
+        
+        .img-agotada { filter: grayscale(100%); opacity: 0.4; }
+        .badge-agotado { background-color: #D84315; color: white; padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; text-transform: uppercase; border: none; display: inline-block; }
 
-const app = express();
-app.use(cors());
-app.use(express.json());
+        #carrito-panel { position: fixed; bottom: 0; left: 0; right: 0; background: white; box-shadow: 0 -4px 10px rgba(0,0,0,0.15); border-radius: 16px 16px 0 0; padding: 15px; z-index: 1000; }
+        .carrito-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #FFE0B2; padding-bottom: 8px; margin-bottom: 10px; }
+        .carrito-titulo { font-size: 16px; font-weight: bold; color: #5D4037; }
+        .btn-vaciar { background: #ECEFF1; color: #D84315; border: none; padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: bold; cursor: pointer; }
+        #lista-carrito { max-height: 100px; overflow-y: auto; margin-bottom: 10px; }
+        .carrito-item { display: flex; justify-content: space-between; align-items: center; font-size: 14px; padding: 6px 0; border-bottom: 1px dashed #FFE0B2; }
+        .btn-eliminar-item { color: #D84315; font-weight: bold; cursor: pointer; border: none; background: none; font-size: 16px; padding: 0 10px; }
+        .carrito-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 10px; }
+        .total-box { font-size: 18px; font-weight: bold; color: #5D4037; }
+        .btn-enviar { background-color: #2E7D32; color: white; border: none; padding: 12px 24px; border-radius: 25px; font-size: 15px; font-weight: bold; width: 55%; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Sabor Al Instante</h1>
+        <div class="mesa-badge">Mesa número: <span id="lblMesa">1</span></div>
+    </header>
 
-// Servir archivos estáticos de la carpeta public
-app.use(express.static(path.join(__dirname, 'public')));
+    <div class="container" id="menu-container"></div>
 
-// Conexión a tu base de datos externa de Render
-const pool = new Pool({
-    connectionString: "postgres://admin_sabor:XEWIuMcIFpQzVvRfxijZ9Nf5oDEgZUY9@dpg-d93ldna8qa3s73auvihg-a.virginia-postgres.render.com/sabor_db?ssl=true"
-});
+    <div id="carrito-panel">
+        <div class="carrito-header">
+            <span class="carrito-titulo">🛒 Tu Pedido</span>
+            <button class="btn-vaciar" onclick="vaciarCarrito()">🗑️ Vaciar todo</button>
+        </div>
+        <div id="lista-carrito"></div>
+        <div class="carrito-footer">
+            <div class="total-box">Total: $<span id="total-precio">0.00</span></div>
+            <button class="btn-enviar" onclick="enviarPedido()">🚀 Enviar Pedido</button>
+        </div>
+    </div>
 
-// Ruta para obtener el menú (incluyendo la columna disponible)
-app.get('/api/menu', async (req, res) => {
-    try {
-        const result = await pool.query('SELECT id, nombre, precio, tiempopreparacion, imagenurl, disponible FROM menu ORDER BY id ASC');
-        res.json(result.rows);
-    } catch (err) { 
-        console.error("Error menú:", err.message);
-        res.status(500).send(err.message); 
-    }
-});
+    <script>
+        // Al usar rutas relativas fijas, no importa el dominio de Render ni las mayúsculas/minúsculas.
+        const urlParams = new URLSearchParams(window.location.search);
+        const numMesa = parseInt(urlParams.get('mesa')) || 1;
+        document.getElementById('lblMesa').innerText = numMesa;
 
-// Ruta para registrar pedidos
-app.post('/api/pedidos', async (req, res) => {
-    const { mesa, contenidopedido } = req.body;
-    if (!mesa || !contenidopedido) {
-        return res.status(400).send("Faltan datos");
-    }
-    try {
-        await pool.query('INSERT INTO pedidos (mesa, contenidopedido) VALUES ($1, $2)', [parseInt(mesa), contenidopedido]);
-        res.sendStatus(200);
-    } catch (err) { 
-        console.error("Error pedido:", err.message);
-        res.status(500).send(err.message); 
-    }
-});
+        let carrito = [];
+        let productosData = [];
 
-// Cargar el index.html si entran a cualquier otra ruta de la web
-app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
+        async function cargarMenu() {
+            try {
+                const response = await fetch('/api/menu');
+                productosData = await response.json();
+                const container = document.getElementById('menu-container');
+                container.innerHTML = '';
+                
+                productosData.forEach(p => {
+                    const imgUrl = p.imagenurl || 'https://via.placeholder.com/80?text=Sabor';
+                    let botonOTexto = '';
+                    let claseImagen = 'producto-img';
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Servidor corriendo en puerto ${PORT}`));
+                    if (p.disponible === false || p.disponible === 'false' || p.disponible === 0) {
+                        botonOTexto = `<span class="badge-agotado">⚠️ Agotado</span>`;
+                        claseImagen = 'producto-img img-agotada';
+                    } else {
+                        botonOTexto = `<button class="btn-add" onclick="agregarAlCarrito(${p.id})">+ Añadir</button>`;
+                    }
+
+                    container.innerHTML += `
+                        <div class="producto-card">
+                            <img src="${imgUrl}" class="${claseImagen}" alt="${p.nombre}">
+                            <div class="producto-info">
+                                <div class="producto-name">${p.nombre}</div>
+                                <div class="producto-detalles">🕒 Tdo. Prep: ${p.tiempopreparacion} min</div>
+                                <div class="producto-precio">$${parseFloat(p.precio).toFixed(2)}</div>
+                            </div>
+                            <div>
+                                ${botonOTexto}
+                            </div>
+                        </div>
+                    `;
+                });
+            } catch (error) {
+                console.error("Error al cargar el menú:", error);
+            }
+        }
+
+        function agregarAlCarrito(id) {
+            const producto = productosData.find(p => p.id === id);
+            if (producto) {
+                carrito.push(producto);
+                actualizarCarrito();
+            }
+        }
+
+        function eliminarDelCarrito(index) {
+            carrito.splice(index, 1);
+            actualizarCarrito();
+        }
+
+        function vaciarCarrito() {
+            carrito = [];
+            actualizarCarrito();
+        }
+
+        function actualizarCarrito() {
+            const lista = document.getElementById('lista-carrito');
+            const totalSpan = document.getElementById('total-precio');
+            lista.innerHTML = '';
+            let total = 0;
+
+            carrito.forEach((item, index) => {
+                total += parseFloat(item.precio);
+                lista.innerHTML += `
+                    <div class="carrito-item">
+                        <span>🍔 ${item.nombre}</span>
+                        <div>
+                            <span>$${parseFloat(item.precio).toFixed(2)}</span>
+                            <button class="btn-eliminar-item" onclick="eliminarDelCarrito(${index})">×</button>
+                        </div>
+                    </div>
+                `;
+            });
+
+            totalSpan.innerText = total.toFixed(2);
+        }
+
+        async function enviarPedido() {
+            if (carrito.length === 0) {
+                alert("El carrito está vacío.");
+                return;
+            }
+
+            const resumen = carrito.map(i => i.nombre).join('\n');
+
+            try {
+                const response = await fetch('/api/pedidos', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        mesa: numMesa,
+                        contenidopedido: resumen
+                    })
+                });
+
+                if (response.ok) {
+                    alert("🚀 ¡Pedido enviado con éxito a la cocina!");
+                    vaciarCarrito();
+                } else {
+                    alert("Hubo un problema al enviar el pedido.");
+                }
+            } catch (error) {
+                console.error("Error al enviar el pedido:", error);
+                alert("Error de conexión con el servidor.");
+            }
+        }
+
+        cargarMenu();
+    </script>
+</body>
+</html>

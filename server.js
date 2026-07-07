@@ -24,10 +24,10 @@ pool.connect((err, client, release) => {
     release();
 });
 
-// Obtener el menú (Corregido a minúsculas puras idéntico a tu C#)
+// 🛠️ CORRECCIÓN DE MENÚ: Ahora SÍ descarga la columna "disponible" para que el celular sepa si está Agotado
 app.get('/api/menu', async (req, res) => {
     try {
-        const result = await pool.query('SELECT id, nombre, precio, tiempopreparacion, imagenurl FROM menu ORDER BY id ASC');
+        const result = await pool.query('SELECT id, nombre, precio, tiempopreparacion, imagenurl, disponible FROM menu ORDER BY id ASC');
         res.json(result.rows);
     } catch (err) { 
         console.error("Error al obtener menú:", err.message);
@@ -35,24 +35,29 @@ app.get('/api/menu', async (req, res) => {
     }
 });
 
-// Registrar un pedido (Corregido a minúsculas puras idéntico a tu C#)
+// 🛠️ CORRECCIÓN DE PEDIDOS: Cambiado de "contenido" a "contenidopedido" para que enlace con el HTML
 app.post('/api/pedidos', async (req, res) => {
-    const { mesa, contenido } = req.body;
+    const { mesa, contenidopedido } = req.body;
     
-    if (!mesa || !contenido) {
-        return res.status(400).send("Faltan datos requeridos (mesa o contenido)");
+    if (!mesa || !contenidopedido) {
+        return res.status(400).send("Faltan datos requeridos (mesa o contenidopedido)");
     }
 
     try {
         const queryText = 'INSERT INTO pedidos (mesa, contenidopedido) VALUES ($1, $2)';
-        await pool.query(queryText, [parseInt(mesa), contenido]);
+        await pool.query(queryText, [parseInt(mesa), contenidopedido]);
         
-        console.log(`🚀 ¡Pedido recibido! Mesa: ${mesa}, Orden: ${contenido}`);
+        console.log(`🚀 ¡Pedido recibido! Mesa: ${mesa}, Orden: ${contenidopedido}`);
         res.sendStatus(200);
     } catch (err) { 
         console.error("❌ Error al insertar pedido en Render:", err.message);
         res.status(500).send(err.message); 
     }
+});
+
+// Asegura que la raíz busque el archivo index.html dentro de public y no deje la pantalla beige
+app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 const PORT = process.env.PORT || 3000;
